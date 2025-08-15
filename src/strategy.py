@@ -44,6 +44,20 @@ class KeltnerChannelsStrategy:
         else:
             self.pdt_manager = None
     
+    def get_source_value(self, row):
+        """Get the source value based on configuration"""
+        src = self.params['src']
+        if src == 'close':
+            return row['close']
+        elif src == 'hl2':
+            return (row['high'] + row['low']) / 2
+        elif src == 'hlc3':
+            return (row['high'] + row['low'] + row['close']) / 3
+        elif src == 'ohlc4':
+            return (row['open'] + row['high'] + row['low'] + row['close']) / 4
+        else:
+            return row['close']
+    
     def prepare_data(self, df):
         """Add indicators to dataframe"""
         # Calculate Keltner Channels
@@ -60,20 +74,6 @@ class KeltnerChannelsStrategy:
         # Merge with original dataframe
         for col in kc.columns:
             df[col] = kc[col]
-        
-        # Detect crosses
-        df['cross_upper'] = (
-            (df['close'] > df['kc_upper']) & 
-            (df['close'].shift(1) <= df['kc_upper'].shift(1))
-        )
-        df['cross_lower'] = (
-            (df['close'] < df['kc_lower']) & 
-            (df['close'].shift(1) >= df['kc_lower'].shift(1))
-        )
-        
-        # Fill NaN values with False for cross columns
-        df['cross_upper'] = df['cross_upper'].fillna(False)
-        df['cross_lower'] = df['cross_lower'].fillna(False)
         
         return df
     

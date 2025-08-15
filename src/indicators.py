@@ -11,13 +11,21 @@ def ema(series, period):
     """Exponential Moving Average"""
     return series.ewm(span=period, adjust=False).mean()
 
+def rma(series, period):
+    """Wilder's RMA (used in Pine's ta.rma and ta.atr)
+    Pine's RMA = alpha * src + (1 - alpha) * prev_rma
+    where alpha = 1/period
+    """
+    alpha = 1.0 / period
+    return series.ewm(alpha=alpha, adjust=False).mean()
+
 def atr(high, low, close, period):
-    """Average True Range"""
+    """Average True Range using Wilder's RMA (matches Pine)"""
     tr1 = high - low
     tr2 = abs(high - close.shift(1))
     tr3 = abs(low - close.shift(1))
     tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
-    return tr.rolling(window=period).mean()
+    return rma(tr, period)  # Use RMA not SMA
 
 def true_range(high, low, close):
     """True Range for single period"""
@@ -30,7 +38,7 @@ def true_range(high, low, close):
 def keltner_channels(df, length=20, mult=2.0, src='close', use_ema=True, 
                      bands_style='ATR', atr_length=10):
     """
-    Calculate Keltner Channels
+    Calculate Keltner Channels (matching Pine exactly)
     
     Parameters:
     -----------
@@ -54,6 +62,8 @@ def keltner_channels(df, length=20, mult=2.0, src='close', use_ema=True,
         source = (df['high'] + df['low']) / 2
     elif src == 'hlc3':
         source = (df['high'] + df['low'] + df['close']) / 3
+    elif src == 'ohlc4':
+        source = (df['open'] + df['high'] + df['low'] + df['close']) / 4
     else:
         source = df['close']
     
@@ -63,13 +73,13 @@ def keltner_channels(df, length=20, mult=2.0, src='close', use_ema=True,
     else:
         middle = sma(source, length)
     
-    # Calculate range for bands
-    if bands_style == 'ATR':
+    # Calculate range for bands (matching Pine)
+    if bands_style == 'ATR' or bands_style == 'Average True Range':
         range_ma = atr(df['high'], df['low'], df['close'], atr_length)
-    elif bands_style == 'TR':
+    elif bands_style == 'TR' or bands_style == 'True Range':
         range_ma = true_range(df['high'], df['low'], df['close'])
-    else:  # Range
-        range_ma = sma(df['high'] - df['low'], length)
+    else:  # Range - uses RMA in Pine
+        range_ma = rma(df['high'] - df['low'], length)
     
     # Calculate bands
     upper = middle + (range_ma * mult)
