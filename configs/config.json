@@ -1,0 +1,37 @@
+{
+    "data": {
+        "symbol": "SPY",
+        "start_date": "2024-08-15",
+        "end_date": "2025-08-14",
+        "timeframe": "1d",
+        "data_source": "yfinance"
+    },
+    "strategy": {
+        "name": "Keltner Channels",
+        "initial_capital": 10000,
+        "position_size": 0.1,
+        "commission": 0.0006,
+        "parameters": {
+            "length": 20,
+            "multiplier": 2.0,
+            "src": "close",
+            "use_ema": true,
+            "bands_style": "ATR",
+            "atr_length": 10
+        }
+    },
+    "risk_management": {
+        "enable_pdt": false,
+        "pdt_threshold": 25000,
+        "max_day_trades": 3,
+        "rolling_days": 5,
+        "exit_before_close": false,
+        "exit_time": "15:55"
+    },
+    "output": {
+        "save_trades": true,
+        "save_metrics": true,
+        "plot_equity": true,
+        "verbose": true
+    }
+}
