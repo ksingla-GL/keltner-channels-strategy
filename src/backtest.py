@@ -67,11 +67,7 @@ class Backtester:
                     'return': (pnl / (shares * entry_price)) * 100
                 })
                 
-                # Update PDT manager if needed
-                if self.strategy.pdt_manager:
-                    self.strategy.pdt_manager.record_trade(
-                        entry_time, current_time, current_time
-                    )
+                # NOTE: PDT tracking removed - Pine calculates but doesn't use it
                 
                 position = 0
                 shares = 0

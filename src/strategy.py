@@ -12,6 +12,8 @@ class KeltnerChannelsStrategy:
     
     Enters long when price crosses above upper band
     Enters short when price crosses below lower band
+    
+    NOTE: PDT is calculated but NOT used for trade gating (matches PineScript exactly)
     """
     
     def __init__(self, config):
@@ -31,12 +33,13 @@ class KeltnerChannelsStrategy:
         self.buy_stop_active = False
         self.sell_stop_active = False
         
-        # PDT Manager
-        if self.risk_config['enable_pdt']:
+        # PDT Manager - created but not used for gating (matches Pine behavior)
+        # In Pine: canTrade = tools.PDT() is computed but never referenced
+        if self.risk_config.get('calculate_pdt', False):  # Optional flag
             self.pdt_manager = PDTManager(
-                threshold=self.risk_config['pdt_threshold'],
-                max_day_trades=self.risk_config['max_day_trades'],
-                rolling_days=self.risk_config['rolling_days']
+                threshold=self.risk_config.get('pdt_threshold', 25000),
+                max_day_trades=self.risk_config.get('max_day_trades', 3),
+                rolling_days=self.risk_config.get('rolling_days', 5)
             )
         else:
             self.pdt_manager = None
@@ -79,11 +82,8 @@ class KeltnerChannelsStrategy:
         if not self.risk_config['exit_before_close']:
             return False
             
-        exit_hour, exit_minute = map(int, self.risk_config['exit_time'].split(':'))
-        exit_time = time(exit_hour, exit_minute)
-        
-        # For daily data, we don't have intraday times
-        # This would be more relevant for intraday strategies
+        # For daily data, this won't trigger
+        # Would need 5-minute data to properly implement MC() logic
         return False
     
     def generate_signals(self, df, equity_curve):
@@ -108,15 +108,12 @@ class KeltnerChannelsStrategy:
             if i > 0 and len(equity_curve) > i:
                 current_equity = equity_curve[i-1]
             
-            # New day reset for PDT
-            if self.pdt_manager and i > 0:
-                if df.index[i].date() != df.index[i-1].date():
-                    self.pdt_manager.new_day()
-            
-            # Check if we can trade (PDT rules)
-            can_trade = True
+            # Calculate PDT status (but don't use it for gating)
+            # This matches Pine where canTrade = tools.PDT() is computed but unused
+            can_trade_pdt = True
             if self.pdt_manager:
-                can_trade = self.pdt_manager.can_trade(current_equity, current_time)
+                can_trade_pdt = self.pdt_manager.can_trade(current_equity, current_time)
+                # In Pine, this value is calculated but NEVER used in entry conditions
             
             # Update stop prices on crosses (persistent like Pine)
             if row['cross_upper']:
@@ -140,17 +137,17 @@ class KeltnerChannelsStrategy:
                 if cancel_sell:
                     self.sell_stop_active = False
             
-            # Generate signals (only on fresh crosses, not from persistent flags)
-            if can_trade:
-                if row['cross_upper']:  # Fresh cross, not just active flag
-                    df.loc[current_time, 'signal'] = 1
-                    df.loc[current_time, 'stop_price'] = self.buy_stop_price
-                    
-                elif row['cross_lower']:  # Fresh cross, not just active flag
-                    df.loc[current_time, 'signal'] = -1
-                    df.loc[current_time, 'stop_price'] = self.sell_stop_price
+            # Generate signals - NO PDT GATING (matches Pine exactly)
+            # In Pine: if (crossUpper) with NO canTrade check
+            if row['cross_upper']:  # Fresh cross, NO PDT check
+                df.loc[current_time, 'signal'] = 1
+                df.loc[current_time, 'stop_price'] = self.buy_stop_price
+                
+            elif row['cross_lower']:  # Fresh cross, NO PDT check
+                df.loc[current_time, 'signal'] = -1
+                df.loc[current_time, 'stop_price'] = self.sell_stop_price
             
-            # Market close exit
+            # Market close exit (would need 5-min data to work properly)
             if self.check_market_close(current_time) and self.position != 0:
                 df.loc[current_time, 'signal'] = 0  # Exit signal
         

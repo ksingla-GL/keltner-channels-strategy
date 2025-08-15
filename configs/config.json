@@ -21,7 +21,7 @@
         }
     },
     "risk_management": {
-        "enable_pdt": false,
+        "calculate_pdt": false,
         "pdt_threshold": 25000,
         "max_day_trades": 3,
         "rolling_days": 5,
